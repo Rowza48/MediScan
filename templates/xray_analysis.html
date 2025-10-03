@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Try X-Ray Analysis | MediScan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    {% include 'navbar.html' %}
+    <section class="demo">
+        <div class="container">
+            <div class="section-title">
+                <h2>Try X-Ray Analysis</h2>
+                
+            </div>
+            <div class="upload-area">
+                <div class="upload-icon"><i class="fas fa-file-medical"></i></div>
+                <h3>Upload Chest X-Ray Image</h3>
+                <p>Supported formats: JPG, PNG, DICOM</p>
+                <input type="file" id="file-upload" style="display: none;">
+                <button class="btn" onclick="document.getElementById('file-upload').click()">Select Image</button>
+                
+            </div>
+            <div class="result-area" id="result-area">
+                <div class="result-header"><h3>Analysis Results</h3><p>MediScan has analyzed your X-ray image</p></div>
+                <div class="result-content">
+                    <div class="result-image"><img id="result-img" src="" alt="X-Ray Result"></div>
+                    <div class="result-details">
+                        <div class="disease-card">
+                            <h4><i class="fas fa-lungs-virus"></i> Analysis Result</h4>
+                            <p id="result-label">Please upload an X-ray image to see the result.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% include 'footer.html' %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

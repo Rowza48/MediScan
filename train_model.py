@@ -1,113 +1,105 @@
+# train_resnet50.py
 import os
-import json
+import pickle
 import numpy as np
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
+from sklearn.utils.class_weight import compute_class_weight
 
-# ======================
-# 1. Dataset Paths
-# ======================
-train_dir = "Dataset/Dataset_5_Class_Crop/train"
-val_dir = "Dataset/Dataset_5_Class_Crop/val"
-test_dir = "Dataset/Dataset_5_Class_Crop/test"
+# Dataset paths
+train_dir = "dataset/train"
+val_dir = "dataset/val"
+model_dir = "model"
+os.makedirs(model_dir, exist_ok=True)  # ensure model folder exists
 
-img_size = 224
-batch_size = 32
-epochs = 20
-
-# ======================
-# 2. Data Generators
-# ======================
+# ImageDataGenerator with augmentation
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
+    preprocessing_function=preprocess_input,  # important for ResNet
     rotation_range=15,
     width_shift_range=0.1,
     height_shift_range=0.1,
-    zoom_range=0.1,
     shear_range=0.1,
-    brightness_range=[0.7, 1.3],
+    zoom_range=0.1,
     horizontal_flip=True
 )
 
-val_datagen = ImageDataGenerator(rescale=1./255)
-test_datagen = ImageDataGenerator(rescale=1./255)
+val_datagen = ImageDataGenerator(
+    preprocessing_function=preprocess_input
+)
 
+# Flow generators
 train_gen = train_datagen.flow_from_directory(
     train_dir,
-    target_size=(img_size, img_size),
-    batch_size=batch_size,
-    class_mode="categorical",
-    color_mode="rgb"
+    target_size=(224, 224),
+    batch_size=32,
+    class_mode="categorical"
 )
 
 val_gen = val_datagen.flow_from_directory(
     val_dir,
-    target_size=(img_size, img_size),
-    batch_size=batch_size,
+    target_size=(224, 224),
+    batch_size=32,
     class_mode="categorical",
-    color_mode="rgb"
+    shuffle=False
 )
 
-test_gen = test_datagen.flow_from_directory(
-    test_dir,
-    target_size=(img_size, img_size),
-    batch_size=batch_size,
-    class_mode="categorical",
-    shuffle=False,
-    color_mode="rgb"
+# Save class names
+class_names = list(train_gen.class_indices.keys())
+with open(os.path.join(model_dir, "class_names.pkl"), "wb") as f:
+    pickle.dump(class_names, f)
+print("Class order:", class_names)
+
+# Compute class weights (handles imbalance)
+labels = train_gen.classes
+class_weights = compute_class_weight(
+    class_weight="balanced",
+    classes=np.unique(labels),
+    y=labels
 )
+class_weights = dict(enumerate(class_weights))
+print("Class weights:", class_weights)
 
-# ======================
-# 3. Save Class Labels
-# ======================
-class_indices = train_gen.class_indices
-classes = {v: k for k, v in class_indices.items()}
+# Load ResNet50 base
+base_model = ResNet50(weights="imagenet", include_top=False, input_shape=(224, 224, 3))
 
-os.makedirs("model", exist_ok=True)
-with open("model/classes.json", "w") as f:
-    json.dump(classes, f)
+# Freeze base model for transfer learning
+for layer in base_model.layers:
+    layer.trainable = False
 
-print("✅ Classes saved at model/classes.json:", classes)
+# Add custom layers
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(512, activation="relu")(x)
+x = Dropout(0.5)(x)
+predictions = Dense(len(class_names), activation="softmax")(x)
 
-# ======================
-# 4. Build Custom CNN Model
-# ======================
-model = Sequential([
-    Conv2D(32, (3,3), activation='relu', input_shape=(img_size, img_size, 3)),
-    MaxPooling2D((2,2)),
+model = Model(inputs=base_model.input, outputs=predictions)
 
-    Conv2D(64, (3,3), activation='relu'),
-    MaxPooling2D((2,2)),
+# Compile
+model.compile(optimizer=Adam(1e-4), loss="categorical_crossentropy", metrics=["accuracy"])
 
-    Conv2D(128, (3,3), activation='relu'),
-    MaxPooling2D((2,2)),
+# Callbacks
+es = EarlyStopping(monitor="val_accuracy", patience=10, restore_best_weights=True)
+rlp = ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6)
+mc = ModelCheckpoint(os.path.join(model_dir, "lung_disease_resnet50.h5"), monitor="val_accuracy", save_best_only=True)
 
-    Flatten(),
-    Dense(256, activation='relu'),
-    Dropout(0.5),
-    Dense(len(classes), activation='softmax')
-])
-
-# ======================
-# 5. Compile Model
-# ======================
-model.compile(optimizer=Adam(learning_rate=0.0001),
-              loss="categorical_crossentropy",
-              metrics=["accuracy"])
-
-# ======================
-# 6. Train Model
-# ======================
+# Train
 history = model.fit(
     train_gen,
     validation_data=val_gen,
-    epochs=epochs
+    epochs=30,
+    class_weight=class_weights,
+    callbacks=[es, rlp, mc]
 )
 
-# ======================
-# 7. Save Model
-# ======================
-model.save("model/multiscan_cnn_model.h5")
-print("🎉 CNN Model saved at model/multiscan_cnn_model.h5")
+# Save training history for plotting later
+with open(os.path.join(model_dir, "history_resnet50.pkl"), "wb") as f:
+    pickle.dump(history.history, f)
+
+print("✅ Training finished. Model saved as model/lung_disease_resnet50.h5")
+print("✅ Training history saved as model/history_resnet50.pkl")

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>About MediScan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    {% include 'navbar.html' %}
+    <section class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>About MediScan</h2>
+                
+            </div>
+            <div class="about-content">
+                
+                <div class="about-text">
+                    <h3>Our Mission</h3>
+                    <br>
+                    <p>MediScan was developed with the mission to make advanced medical diagnostics accessible to healthcare professionals worldwide. By leveraging the power of artificial intelligence, we aim to reduce diagnostic errors and improve patient outcomes.</p>
+                    <br>
+                    <h3>Our Technology</h3>
+                    <br>
+                    <p>Using state-of-the-art deep learning architectures including Convolutional Neural Networks (CNNs) and Transfer Learning, MediScan can accurately identify various lung conditions from chest X-ray images with precision matching expert radiologists.</p>
+                    <br>
+                </div>
+            </div>
+           
+        </div>
+    </section>
+    {% include 'footer.html' %}
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
